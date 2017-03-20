@@ -275,6 +275,8 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	} else {
 		ceph_opt = "name=" + cephfsVolume.id + ",secretfile=" + cephfsVolume.secret_file
 	}
+	// make sure all mounts are done with "noshare" option
+	ceph_opt += ",noshare"
 	// build option array
 	opt := []string{}
 	if cephfsVolume.readonly {
