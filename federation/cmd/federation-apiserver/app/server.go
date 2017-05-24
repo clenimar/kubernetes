@@ -30,6 +30,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachineryopenapi "k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -43,6 +45,7 @@ import (
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
@@ -232,6 +235,12 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return err
 	}
 
+	// TODO: create the "default" namespace <<<<<<<<<<<<<<<<<<<<
+	nsClient := coreclient.NewForConfigOrDie(genericConfig.LoopbackClientConfig)
+	if err := createNamespaceIfNeeded(nsClient, metav1.NamespaceDefault); err != nil {
+		glog.Warning("Couldn't create default namespace in the FCP.")
+	}
+
 	routes.UIRedirect{}.Install(m.Handler.PostGoRestfulMux)
 	routes.Logs{}.Install(m.Handler.GoRestfulContainer)
 
@@ -253,6 +262,23 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	err = m.PrepareRun().NonBlockingRun(stopCh)
 	if err == nil {
 		sharedInformers.Start(stopCh)
+	}
+	return err
+}
+
+func createNamespaceIfNeeded(nsClient coreclient.NamespacesGetter, ns string) error {
+	if _, err := nsClient.Namespaces().Get(ns, metav1.GetOptions{}); err == nil {
+		return nil
+	}
+	newNs := &api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ns,
+			Namespace: "",
+		},
+	}
+	_, err := nsClient.Namespaces().Create(newNs)
+	if err != nil && errors.IsAlreadyExists(err) {
+		err = nil
 	}
 	return err
 }
