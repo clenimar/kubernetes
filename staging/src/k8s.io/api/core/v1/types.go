@@ -5028,7 +5028,7 @@ type Secret struct {
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 
-const MaxSecretSize = 1 * 1024 * 1024
+const MaxSecretSize = 16 * 1024 * 1024
 
 type SecretType string
 
